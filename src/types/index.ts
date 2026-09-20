@@ -107,3 +107,12 @@ export interface IEligibilityBreakdown {
   matchedRules: string[];
   unmatchedRules: string[];
 }
+
+export interface ISavedScheme {
+  _id: string;
+  user: string;
+  scheme: IScheme;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Send,
   X,
+  Bookmark,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -29,6 +30,8 @@ export default function SchemeDetailPage() {
   const { user } = useAuth();
   const [scheme, setScheme] = useState<IScheme | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submittedApp, setSubmittedApp] = useState<any | null>(null);
@@ -53,12 +56,39 @@ export default function SchemeDetailPage() {
       .get(`/schemes/${slug}`)
       .then((res) => {
         if (res.data?.data) {
-          setScheme(res.data.data);
+          const loadedScheme = res.data.data;
+          setScheme(loadedScheme);
+          if (user) {
+            api.get(`/saved-schemes/check/${loadedScheme._id}`).then((chk) => {
+              setIsSaved(Boolean(chk.data?.isSaved));
+            }).catch(() => null);
+          }
         }
       })
       .catch((e) => console.error('Failed to load scheme details:', e))
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, user]);
+
+  const handleToggleBookmark = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (!scheme) return;
+
+    setSaving(true);
+    const nextState = !isSaved;
+    setIsSaved(nextState);
+
+    try {
+      await api.post('/saved-schemes/toggle', { schemeId: scheme._id });
+    } catch (e) {
+      setIsSaved(isSaved);
+      console.error('Failed to save scheme:', e);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +193,21 @@ export default function SchemeDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleToggleBookmark}
+              disabled={saving}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all ${
+                isSaved
+                  ? 'bg-amber-500/10 border-amber-500/30 text-gov-saffron hover:bg-amber-500/20'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-gov-saffron/50 hover:text-gov-saffron'
+              }`}
+            >
+              <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-gov-saffron text-gov-saffron' : ''}`} />
+              <span>{isSaved ? 'Saved in Watchlist' : 'Save Scheme'}</span>
+            </button>
+
             <Button variant="primary" size="lg" onClick={() => setModalOpen(true)} className="shadow-glow">
               <span>Apply for Scheme</span>
               <ArrowRight className="w-4 h-4 ml-2" />

@@ -6,9 +6,11 @@ import api from '../../lib/api';
 import { IScheme, ICategory } from '../../types';
 import { SchemeCard } from '../../components/schemes/SchemeCard';
 import { Button } from '../../components/ui/Button';
+import { useAuth } from '../../context/AuthContext';
 import { Search, Filter, RotateCcw, Landmark, Sparkles } from 'lucide-react';
 
 function SchemesContent() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get('category') || '';
   const initialSearch = searchParams.get('search') || '';
@@ -17,6 +19,7 @@ function SchemesContent() {
 
   const [schemes, setSchemes] = useState<IScheme[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
+  const [savedSchemeIds, setSavedSchemeIds] = useState<Set<string>>(new Set());
   const [statesSummary, setStatesSummary] = useState<{
     centralCount: number;
     totalCount: number;
@@ -62,6 +65,32 @@ function SchemesContent() {
       if (res.data?.data) setStatesSummary(res.data.data);
     }).catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      api.get('/saved-schemes/ids')
+        .then((res) => {
+          if (Array.isArray(res.data?.data)) {
+            setSavedSchemeIds(new Set(res.data.data));
+          }
+        })
+        .catch(() => null);
+    } else {
+      setSavedSchemeIds(new Set());
+    }
+  }, [user]);
+
+  const handleToggleSave = (schemeId: string, isSaved: boolean) => {
+    setSavedSchemeIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) {
+        next.add(schemeId);
+      } else {
+        next.delete(schemeId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchSchemes();
@@ -297,7 +326,12 @@ function SchemesContent() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {schemes.map((scheme) => (
-            <SchemeCard key={scheme._id} scheme={scheme} />
+            <SchemeCard
+              key={scheme._id}
+              scheme={scheme}
+              isSaved={savedSchemeIds.has(scheme._id)}
+              onToggleSave={handleToggleSave}
+            />
           ))}
         </div>
       )}

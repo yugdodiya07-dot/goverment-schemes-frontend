@@ -1,20 +1,58 @@
-'use client';
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { IScheme } from '../../types';
 import { Badge } from '../ui/Badge';
-import { ArrowRight, Landmark, IndianRupee, Bookmark, Sparkles } from 'lucide-react';
+import { ArrowRight, Landmark, IndianRupee, Bookmark, Sparkles, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../lib/api';
 
 interface SchemeCardProps {
   scheme: IScheme;
   matchScore?: number;
+  isSaved?: boolean;
+  onToggleSave?: (schemeId: string, isSaved: boolean) => void;
 }
 
-export const SchemeCard: React.FC<SchemeCardProps> = ({ scheme, matchScore }) => {
+export const SchemeCard: React.FC<SchemeCardProps> = ({ scheme, matchScore, isSaved = false, onToggleSave }) => {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [saved, setSaved] = useState(isSaved);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setSaved(isSaved);
+  }, [isSaved]);
+
+  const handleBookmark = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    setSaving(true);
+    const nextState = !saved;
+    setSaved(nextState);
+
+    try {
+      await api.post('/saved-schemes/toggle', { schemeId: scheme._id });
+      if (onToggleSave) {
+        onToggleSave(scheme._id, nextState);
+      }
+    } catch (err) {
+      setSaved(saved); // rollback
+      console.error('Failed to toggle bookmark:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-card hover:shadow-cardHover hover:-translate-y-1 transition-all duration-200">
-      {/* Top row: Ministry & Score */}
+      {/* Top row: Ministry, Score & Bookmark */}
       <div>
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
@@ -22,15 +60,35 @@ export const SchemeCard: React.FC<SchemeCardProps> = ({ scheme, matchScore }) =>
             <span className="line-clamp-1">{scheme.ministry}</span>
           </div>
 
-          {matchScore !== undefined && (
-            <Badge
-              variant={matchScore >= 80 ? 'eligible' : matchScore >= 50 ? 'partial' : 'default'}
-              className="shrink-0"
+          <div className="flex items-center gap-1.5 shrink-0">
+            {matchScore !== undefined && (
+              <Badge
+                variant={matchScore >= 80 ? 'eligible' : matchScore >= 50 ? 'partial' : 'default'}
+                className="shrink-0"
+              >
+                <Sparkles className="w-3 h-3" />
+                {matchScore}% Match
+              </Badge>
+            )}
+
+            <button
+              onClick={handleBookmark}
+              disabled={saving}
+              title={saved ? 'Remove from Saved Watchlist' : 'Save Scheme'}
+              aria-label="Save Scheme"
+              className={`p-1.5 rounded-xl border transition-all ${
+                saved
+                  ? 'bg-amber-500/10 border-amber-500/30 text-gov-saffron hover:bg-amber-500/20'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-gov-saffron hover:border-gov-saffron/40'
+              }`}
             >
-              <Sparkles className="w-3 h-3" />
-              {matchScore}% Match
-            </Badge>
-          )}
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Bookmark className={`w-3.5 h-3.5 ${saved ? 'fill-gov-saffron text-gov-saffron' : ''}`} />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Scheme Level Badge & Category */}
