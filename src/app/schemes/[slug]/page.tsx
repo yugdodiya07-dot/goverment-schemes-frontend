@@ -21,6 +21,8 @@ import {
   Send,
   X,
   Bookmark,
+  AlertCircle,
+  Check,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -36,16 +38,18 @@ export default function SchemeDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedApp, setSubmittedApp] = useState<any | null>(null);
 
-  // Form data for application
   const [applicantName, setApplicantName] = useState('');
   const [applicantPhone, setApplicantPhone] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [rationOrAadhaar, setRationOrAadhaar] = useState('');
+  const [declarationAgreed, setDeclarationAgreed] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (user) {
-      setApplicantName(user.name);
+      setApplicantName(user.name || '');
       setApplicantPhone(user.phone || '');
     }
   }, [user]);
@@ -68,6 +72,121 @@ export default function SchemeDetailPage() {
       .catch((e) => console.error('Failed to load scheme details:', e))
       .finally(() => setLoading(false));
   }, [slug, user]);
+
+  const validateField = (field: string, val: string): string => {
+    switch (field) {
+      case 'applicantName': {
+        const trimmed = val.trim();
+        if (!trimmed) return 'Beneficiary full name is required.';
+        if (trimmed.length < 3) return 'Full name must be at least 3 characters.';
+        if (trimmed.length > 70) return 'Name cannot exceed 70 characters.';
+        if (!/^[a-zA-Z\s.'-]+$/.test(trimmed)) {
+          return 'Only alphabetic letters, dots, and spaces are permitted.';
+        }
+        return '';
+      }
+      case 'rationOrAadhaar': {
+        const cleaned = val.replace(/[-\s]/g, '');
+        if (!cleaned) return 'Aadhaar or Ration Card number is required.';
+        if (/^\d+$/.test(cleaned)) {
+          if (cleaned.length !== 12) {
+            return 'Aadhaar must contain exactly 12 digits (e.g. 2345-6789-0123).';
+          }
+          if (cleaned.startsWith('0') || cleaned.startsWith('1')) {
+            return 'Valid Aadhaar number cannot begin with 0 or 1.';
+          }
+          return '';
+        }
+        if (!/^[A-Za-z0-9]{10,16}$/.test(cleaned)) {
+          return 'Enter a valid 12-digit Aadhaar or 10–16 character Ration card number.';
+        }
+        return '';
+      }
+      case 'applicantPhone': {
+        const cleaned = val.replace(/\D/g, '');
+        if (!cleaned) return '10-digit mobile number is mandatory for SMS tracking.';
+        if (cleaned.length !== 10) return 'Mobile number must be exactly 10 digits.';
+        if (!/^[6-9]/.test(cleaned)) return 'Indian mobile number must start with 6, 7, 8, or 9.';
+        if (/^(\d)\1{9}$/.test(cleaned) || cleaned === '1234567890') {
+          return 'Please enter a genuine, active mobile number.';
+        }
+        return '';
+      }
+      case 'bankAccount': {
+        const cleaned = val.replace(/\s/g, '');
+        if (!cleaned) return 'Bank account number is required for DBT subsidy transfer.';
+        if (!/^\d+$/.test(cleaned)) return 'Bank account must contain numeric digits only.';
+        if (cleaned.length < 9 || cleaned.length > 18) {
+          return 'Bank account number must be between 9 and 18 digits.';
+        }
+        return '';
+      }
+      case 'ifscCode': {
+        const cleaned = val.trim().toUpperCase();
+        if (!cleaned) return 'Bank IFSC code is required for DBT authorization.';
+        if (cleaned.length !== 11) return 'IFSC must be exactly 11 characters (e.g. SBIN0001234).';
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleaned)) {
+          return 'Invalid format. 4 letters, 5th character "0", then 6 branch characters.';
+        }
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^a-zA-Z\s.'-]/g, '');
+    setApplicantName(val);
+    if (touched.applicantName) {
+      setErrors((prev) => ({ ...prev, applicantName: validateField('applicantName', val) }));
+    }
+  };
+
+  const handleAadhaarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+    let formatted = raw;
+    // Auto-hyphenate if digits only up to 12
+    if (/^\d+$/.test(raw) && raw.length <= 12) {
+      const parts = raw.match(/.{1,4}/g) || [];
+      formatted = parts.join('-');
+    } else {
+      formatted = raw.toUpperCase();
+    }
+    setRationOrAadhaar(formatted);
+    if (touched.rationOrAadhaar) {
+      setErrors((prev) => ({ ...prev, rationOrAadhaar: validateField('rationOrAadhaar', formatted) }));
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setApplicantPhone(val);
+    if (touched.applicantPhone) {
+      setErrors((prev) => ({ ...prev, applicantPhone: validateField('applicantPhone', val) }));
+    }
+  };
+
+  const handleBankAccountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+    setBankAccount(val);
+    if (touched.bankAccount) {
+      setErrors((prev) => ({ ...prev, bankAccount: validateField('bankAccount', val) }));
+    }
+  };
+
+  const handleIfscChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    setIfscCode(val);
+    if (touched.ifscCode) {
+      setErrors((prev) => ({ ...prev, ifscCode: validateField('ifscCode', val) }));
+    }
+  };
+
+  const handleBlur = (field: string, val: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    setErrors((prev) => ({ ...prev, [field]: validateField(field, val) }));
+  };
 
   const handleToggleBookmark = async () => {
     if (!user) {
@@ -98,16 +217,48 @@ export default function SchemeDetailPage() {
     }
     if (!scheme) return;
 
+    // Validate all fields
+    const nameErr = validateField('applicantName', applicantName);
+    const idErr = validateField('rationOrAadhaar', rationOrAadhaar);
+    const phoneErr = validateField('applicantPhone', applicantPhone);
+    const bankErr = validateField('bankAccount', bankAccount);
+    const ifscErr = validateField('ifscCode', ifscCode);
+    const declErr = !declarationAgreed ? 'You must confirm the statutory declaration to proceed.' : '';
+
+    const newErrors = {
+      applicantName: nameErr,
+      rationOrAadhaar: idErr,
+      applicantPhone: phoneErr,
+      bankAccount: bankErr,
+      ifscCode: ifscErr,
+      declaration: declErr,
+    };
+
+    setErrors(newErrors);
+    setTouched({
+      applicantName: true,
+      rationOrAadhaar: true,
+      applicantPhone: true,
+      bankAccount: true,
+      ifscCode: true,
+      declaration: true,
+    });
+
+    if (nameErr || idErr || phoneErr || bankErr || ifscErr || declErr) {
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
         schemeId: scheme._id,
         formData: {
-          applicantName,
+          applicantName: applicantName.trim(),
           applicantPhone,
           bankAccount,
-          ifscCode,
-          rationOrAadhaar,
+          ifscCode: ifscCode.trim().toUpperCase(),
+          rationOrAadhaar: rationOrAadhaar.trim(),
+          statutoryDeclaration: true,
         },
         documents: [
           {
@@ -125,7 +276,10 @@ export default function SchemeDetailPage() {
         confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to submit application');
+      setErrors((prev) => ({
+        ...prev,
+        form: err.response?.data?.message || 'Failed to submit application. Please verify details.',
+      }));
     } finally {
       setSubmitting(false);
     }
@@ -333,9 +487,9 @@ export default function SchemeDetailPage() {
             </button>
 
             {!submittedApp ? (
-              <form onSubmit={handleApplySubmit} className="space-y-4">
+              <form onSubmit={handleApplySubmit} noValidate className="space-y-4">
                 <div>
-                  <span className="text-[11px] font-bold uppercase text-gov-saffron">Single-Window Application</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron">Single-Window Application</span>
                   <h3 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
                     Apply for {scheme.title}
                   </h3>
@@ -347,74 +501,241 @@ export default function SchemeDetailPage() {
                   </div>
                 )}
 
+                {touched.declaration && Object.values(errors).some(Boolean) && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Please correct the highlighted fields before submitting.</span>
+                  </div>
+                )}
+
+                {/* Beneficiary Full Name */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Beneficiary Full Name
+                    Beneficiary Full Name <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={applicantName}
-                    onChange={(e) => setApplicantName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-gov-saffron focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. Aarav Sharma"
+                      value={applicantName}
+                      onChange={handleNameChange}
+                      onBlur={() => handleBlur('applicantName', applicantName)}
+                      className={`w-full px-3 py-2 pr-9 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none transition-colors ${
+                        touched.applicantName && errors.applicantName
+                          ? 'border-rose-500 bg-rose-500/5 focus:ring-2 focus:ring-rose-500'
+                          : touched.applicantName && applicantName.trim()
+                          ? 'border-emerald-500/80 focus:ring-2 focus:ring-emerald-500'
+                          : 'border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-gov-saffron'
+                      }`}
+                    />
+                    {touched.applicantName && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        {errors.applicantName ? (
+                          <AlertCircle className="w-4 h-4 text-rose-500" />
+                        ) : applicantName.trim() ? (
+                          <Check className="w-4 h-4 text-emerald-500" />
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  {touched.applicantName && errors.applicantName && (
+                    <p className="text-[11px] font-medium text-rose-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {errors.applicantName}
+                    </p>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Aadhaar and Mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Aadhaar / Ration No. */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Aadhaar / Ration No.
+                      Aadhaar / Ration No. <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="XXXX-XXXX-XXXX"
-                      value={rationOrAadhaar}
-                      onChange={(e) => setRationOrAadhaar(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-gov-saffron focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="XXXX-XXXX-XXXX"
+                        maxLength={16}
+                        value={rationOrAadhaar}
+                        onChange={handleAadhaarChange}
+                        onBlur={() => handleBlur('rationOrAadhaar', rationOrAadhaar)}
+                        className={`w-full px-3 py-2 pr-9 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none transition-colors ${
+                          touched.rationOrAadhaar && errors.rationOrAadhaar
+                            ? 'border-rose-500 bg-rose-500/5 focus:ring-2 focus:ring-rose-500'
+                            : touched.rationOrAadhaar && rationOrAadhaar.trim()
+                            ? 'border-emerald-500/80 focus:ring-2 focus:ring-emerald-500'
+                            : 'border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-gov-saffron'
+                        }`}
+                      />
+                      {touched.rationOrAadhaar && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {errors.rationOrAadhaar ? (
+                            <AlertCircle className="w-4 h-4 text-rose-500" />
+                          ) : rationOrAadhaar.trim() ? (
+                            <Check className="w-4 h-4 text-emerald-500" />
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                    {touched.rationOrAadhaar && errors.rationOrAadhaar && (
+                      <p className="text-[11px] font-medium text-rose-500 flex items-start gap-1 mt-1 leading-tight">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>{errors.rationOrAadhaar}</span>
+                      </p>
+                    )}
                   </div>
+
+                  {/* Mobile Number */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Mobile Number
+                      Mobile Number <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="tel"
-                      required
-                      value={applicantPhone}
-                      onChange={(e) => setApplicantPhone(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-gov-saffron focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        placeholder="9876501234"
+                        value={applicantPhone}
+                        onChange={handlePhoneChange}
+                        onBlur={() => handleBlur('applicantPhone', applicantPhone)}
+                        className={`w-full px-3 py-2 pr-9 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none transition-colors ${
+                          touched.applicantPhone && errors.applicantPhone
+                            ? 'border-rose-500 bg-rose-500/5 focus:ring-2 focus:ring-rose-500'
+                            : touched.applicantPhone && applicantPhone.trim()
+                            ? 'border-emerald-500/80 focus:ring-2 focus:ring-emerald-500'
+                            : 'border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-gov-saffron'
+                        }`}
+                      />
+                      {touched.applicantPhone && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {errors.applicantPhone ? (
+                            <AlertCircle className="w-4 h-4 text-rose-500" />
+                          ) : applicantPhone.trim() ? (
+                            <Check className="w-4 h-4 text-emerald-500" />
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                    {touched.applicantPhone && errors.applicantPhone && (
+                      <p className="text-[11px] font-medium text-rose-500 flex items-start gap-1 mt-1 leading-tight">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>{errors.applicantPhone}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Bank Account and IFSC */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Bank Account */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Bank Account Number (DBT)
+                      Bank Account Number (DBT) <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Account No."
-                      value={bankAccount}
-                      onChange={(e) => setBankAccount(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-gov-saffron focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        maxLength={18}
+                        placeholder="e.g. 100023456789"
+                        value={bankAccount}
+                        onChange={handleBankAccountChange}
+                        onBlur={() => handleBlur('bankAccount', bankAccount)}
+                        className={`w-full px-3 py-2 pr-9 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none transition-colors ${
+                          touched.bankAccount && errors.bankAccount
+                            ? 'border-rose-500 bg-rose-500/5 focus:ring-2 focus:ring-rose-500'
+                            : touched.bankAccount && bankAccount.trim()
+                            ? 'border-emerald-500/80 focus:ring-2 focus:ring-emerald-500'
+                            : 'border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-gov-saffron'
+                        }`}
+                      />
+                      {touched.bankAccount && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {errors.bankAccount ? (
+                            <AlertCircle className="w-4 h-4 text-rose-500" />
+                          ) : bankAccount.trim() ? (
+                            <Check className="w-4 h-4 text-emerald-500" />
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                    {touched.bankAccount && errors.bankAccount && (
+                      <p className="text-[11px] font-medium text-rose-500 flex items-start gap-1 mt-1 leading-tight">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>{errors.bankAccount}</span>
+                      </p>
+                    )}
                   </div>
+
+                  {/* Bank IFSC */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Bank IFSC Code
+                      Bank IFSC Code <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="SBIN0001234"
-                      value={ifscCode}
-                      onChange={(e) => setIfscCode(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-gov-saffron focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        maxLength={11}
+                        placeholder="SBIN0001234"
+                        value={ifscCode}
+                        onChange={handleIfscChange}
+                        onBlur={() => handleBlur('ifscCode', ifscCode)}
+                        className={`w-full px-3 py-2 pr-9 text-xs font-mono uppercase rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none transition-colors ${
+                          touched.ifscCode && errors.ifscCode
+                            ? 'border-rose-500 bg-rose-500/5 focus:ring-2 focus:ring-rose-500'
+                            : touched.ifscCode && ifscCode.trim()
+                            ? 'border-emerald-500/80 focus:ring-2 focus:ring-emerald-500'
+                            : 'border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-gov-saffron'
+                        }`}
+                      />
+                      {touched.ifscCode && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {errors.ifscCode ? (
+                            <AlertCircle className="w-4 h-4 text-rose-500" />
+                          ) : ifscCode.trim() ? (
+                            <Check className="w-4 h-4 text-emerald-500" />
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                    {touched.ifscCode && errors.ifscCode && (
+                      <p className="text-[11px] font-medium text-rose-500 flex items-start gap-1 mt-1 leading-tight">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>{errors.ifscCode}</span>
+                      </p>
+                    )}
                   </div>
+                </div>
+
+                {/* Statutory Affirmation Checkbox */}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={declarationAgreed}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setDeclarationAgreed(checked);
+                        if (touched.declaration) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            declaration: !checked ? 'You must confirm the statutory declaration to proceed.' : '',
+                          }));
+                        }
+                      }}
+                      className="mt-0.5 rounded text-gov-saffron focus:ring-gov-saffron w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
+                      I solemnly affirm that the Aadhaar, Mobile, and DBT Bank details provided belong to me and are authentic under UIDAI & Government Direct Benefit Transfer regulations.
+                    </span>
+                  </label>
+                  {touched.declaration && errors.declaration && (
+                    <p className="text-[11px] font-medium text-rose-500 flex items-center gap-1 mt-1.5 pt-1 border-t border-rose-200 dark:border-rose-900/40">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{errors.declaration}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="pt-2">
