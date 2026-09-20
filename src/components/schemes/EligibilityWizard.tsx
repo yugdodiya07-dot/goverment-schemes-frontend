@@ -75,8 +75,20 @@ export const EligibilityWizard: React.FC = () => {
     const warnings: string[] = [];
     const notices: string[] = [];
 
+    // Rule 0: Minimum & Maximum Age Validation
+    const ageNum = Number(formData.age);
+    if (!formData.age || isNaN(ageNum) || ageNum <= 0) {
+      errors.push(
+        'Statutory Requirement: Applicant age must be at least 1 completed year (valid range: 1–115 yrs). Neonatal or infant healthcare schemes (< 1 yr) require applying through the mother/guardian profile.'
+      );
+    } else if (ageNum > 115) {
+      errors.push(
+        'Invalid Age: Applicant age exceeds valid civic registry limit (115 years). Please enter a verified age between 1 and 115.'
+      );
+    }
+
     // Rule 1: Child Labour Act (1986)
-    if (formData.age < 14) {
+    if (ageNum > 0 && ageNum < 14) {
       const selectedOcc = OCCUPATIONS.find((o) => o.id === formData.occupation);
       if (selectedOcc?.adultOnly) {
         errors.push(
@@ -258,16 +270,17 @@ export const EligibilityWizard: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Applicant Age (in Completed Years)
+                Applicant Age (in Completed Years) <span className="text-rose-500">*</span>
               </label>
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
-                  min="0"
-                  max="105"
+                  min="1"
+                  max="115"
                   value={formData.age}
                   onChange={(e) => {
-                    const val = Math.max(0, Math.min(105, Number(e.target.value) || 0));
+                    const rawVal = e.target.value;
+                    const val = rawVal === '' ? 0 : Number(rawVal);
                     setFormData({
                       ...formData,
                       age: val,
@@ -275,7 +288,11 @@ export const EligibilityWizard: React.FC = () => {
                       occupation: val < 14 ? 'Student' : formData.occupation,
                     });
                   }}
-                  className="w-16 py-1 px-2 text-center text-xs font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-gov-saffron focus:outline-none focus:ring-2 focus:ring-gov-saffron"
+                  className={`w-20 py-1.5 px-2 text-center text-xs font-bold rounded-lg border transition-all ${
+                    formData.age <= 0 || formData.age > 115
+                      ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-600 focus:ring-rose-500'
+                      : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-gov-saffron focus:ring-gov-saffron'
+                  } focus:outline-none focus:ring-2`}
                 />
                 <span className="text-xs text-slate-500 font-semibold">Years</span>
               </div>
@@ -283,9 +300,9 @@ export const EligibilityWizard: React.FC = () => {
 
             <input
               type="range"
-              min="0"
+              min="1"
               max="95"
-              value={formData.age}
+              value={Math.max(1, formData.age)}
               onChange={(e) => {
                 const val = Number(e.target.value);
                 setFormData({
@@ -297,11 +314,29 @@ export const EligibilityWizard: React.FC = () => {
               className="w-full accent-gov-saffron cursor-pointer"
             />
             <div className="flex justify-between text-[11px] text-slate-400 mt-1">
-              <span>Infant / Child (0-13)</span>
+              <span>Child (1-13)</span>
               <span>Youth (14-35)</span>
               <span>Middle Age (36-59)</span>
               <span>Senior Citizen (60+)</span>
             </div>
+
+            {/* Inline Age Error Banner if 0 or negative */}
+            {(formData.age <= 0 || isNaN(formData.age)) && (
+              <div className="mt-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150">
+                <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>
+                  <strong>Invalid Age:</strong> Age cannot be 0. Enter at least 1 completed year to proceed with scheme eligibility.
+                </span>
+              </div>
+            )}
+            {formData.age > 115 && (
+              <div className="mt-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150">
+                <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>
+                  <strong>Invalid Age:</strong> Applicant age exceeds valid civic registry ceiling (115 yrs).
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -356,7 +391,10 @@ export const EligibilityWizard: React.FC = () => {
           </div>
 
           <div className="flex justify-end pt-4">
-            <Button onClick={() => setStep(2)} disabled={!validation.isValid}>
+            <Button
+              onClick={() => setStep(2)}
+              disabled={!validation.isValid || !formData.age || Number(formData.age) <= 0 || Number(formData.age) > 115}
+            >
               <span>Next: Socioeconomic Details</span>
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
