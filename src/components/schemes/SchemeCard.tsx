@@ -33,6 +33,19 @@ export const SchemeCard: React.FC<SchemeCardProps> = ({ scheme, matchScore }) =>
           )}
         </div>
 
+        {/* Scheme Level Badge & Category */}
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          {scheme.schemeLevel === 'State' ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+              📍 {scheme.state} State Scheme
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+              🏛️ Central Scheme (Pan-India)
+            </span>
+          )}
+        </div>
+
         {/* Title */}
         <Link href={`/schemes/${scheme.slug}`}>
           <h3 className="font-bold text-base text-slate-900 dark:text-white group-hover:text-gov-saffron transition-colors line-clamp-2 leading-snug">

@@ -125,9 +125,20 @@ export default function SchemeDetailPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header Banner */}
       <div className="p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-card mb-8">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-          <Landmark className="w-4 h-4 text-gov-saffron" />
-          <span>{scheme.ministry}</span>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {scheme.schemeLevel === 'State' ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+              📍 State Government of {scheme.state}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+              🏛️ Central Government Scheme (Pan-India)
+            </span>
+          )}
+          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <Landmark className="w-4 h-4 text-gov-saffron" />
+            <span>{scheme.ministry}</span>
+          </div>
         </div>
 
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white leading-tight">

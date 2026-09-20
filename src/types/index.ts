@@ -42,6 +42,8 @@ export interface IScheme {
   category: ICategory | string;
   ministry: string;
   department?: string;
+  schemeLevel?: 'Central' | 'State';
+  state?: string;
   benefitType: string;
   financialBenefit: string;
   eligibilityCriteria: {

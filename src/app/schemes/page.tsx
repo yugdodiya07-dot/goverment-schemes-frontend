@@ -12,13 +12,22 @@ function SchemesContent() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get('category') || '';
   const initialSearch = searchParams.get('search') || '';
+  const initialState = searchParams.get('state') || 'All';
+  const initialLevel = searchParams.get('level') || 'All';
 
   const [schemes, setSchemes] = useState<IScheme[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
+  const [statesSummary, setStatesSummary] = useState<{
+    centralCount: number;
+    totalCount: number;
+    states: Array<{ state: string; count: number }>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [selectedLevel, setSelectedLevel] = useState(initialLevel);
+  const [selectedState, setSelectedState] = useState(initialState);
   const [benefitType, setBenefitType] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
@@ -26,9 +35,11 @@ function SchemesContent() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append('limit', '150');
+      params.append('limit', '200');
       if (search) params.append('search', search);
       if (selectedCategory) params.append('category', selectedCategory);
+      if (selectedLevel && selectedLevel !== 'All') params.append('schemeLevel', selectedLevel);
+      if (selectedState && selectedState !== 'All') params.append('state', selectedState);
       if (benefitType && benefitType !== 'All') params.append('benefitType', benefitType);
       if (sortBy) params.append('sortBy', sortBy);
 
@@ -47,11 +58,14 @@ function SchemesContent() {
     api.get('/categories').then((res) => {
       if (res.data?.data) setCategories(res.data.data);
     });
+    api.get('/schemes/states-summary').then((res) => {
+      if (res.data?.data) setStatesSummary(res.data.data);
+    }).catch(() => null);
   }, []);
 
   useEffect(() => {
     fetchSchemes();
-  }, [selectedCategory, benefitType, sortBy]);
+  }, [selectedCategory, selectedLevel, selectedState, benefitType, sortBy]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,11 +75,15 @@ function SchemesContent() {
   const resetFilters = () => {
     setSearch('');
     setSelectedCategory('');
+    setSelectedLevel('All');
+    setSelectedState('All');
     setBenefitType('All');
     setSortBy('newest');
   };
 
-  const totalSchemesCount = categories.reduce((acc, c) => acc + (c.schemeCount || 0), 0) || schemes.length;
+  const totalSchemesCount = statesSummary?.totalCount || categories.reduce((acc, c) => acc + (c.schemeCount || 0), 0) || schemes.length;
+  const stateSchemesCount = statesSummary?.states.reduce((acc, s) => acc + s.count, 0) || 50;
+  const centralSchemesCount = statesSummary?.centralCount || 104;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -87,6 +105,97 @@ function SchemesContent() {
 
       {/* Filter Bar */}
       <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm mb-8 space-y-4">
+        {/* Scheme Authority Level Toggle (All / Central / State) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold">
+            <button
+              onClick={() => setSelectedLevel('All')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                selectedLevel === 'All'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              All Schemes ({totalSchemesCount})
+            </button>
+            <button
+              onClick={() => setSelectedLevel('Central')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                selectedLevel === 'Central'
+                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-bold'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span>🏛️ Central Govt</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/10 text-blue-600">
+                {centralSchemesCount}
+              </span>
+            </button>
+            <button
+              onClick={() => setSelectedLevel('State')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                selectedLevel === 'State'
+                  ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm font-bold'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span>📍 State Govt</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600">
+                {stateSchemesCount}
+              </span>
+            </button>
+          </div>
+
+          {/* State Filter Dropdown */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500 font-medium">State / UT:</span>
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-gov-saffron"
+            >
+              <option value="All">All India / Any State</option>
+              {statesSummary?.states.map((s) => (
+                <option key={s.state} value={s.state}>
+                  {s.state} ({s.count} State Schemes)
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* State Quick Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+            States:
+          </span>
+          <button
+            onClick={() => setSelectedState('All')}
+            className={`px-2.5 py-1 rounded-lg text-xs shrink-0 transition-colors ${
+              selectedState === 'All'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            All States
+          </button>
+          {statesSummary?.states.slice(0, 10).map((s) => (
+            <button
+              key={s.state}
+              onClick={() => setSelectedState(s.state)}
+              className={`px-2.5 py-1 rounded-lg text-xs shrink-0 transition-colors flex items-center gap-1 ${
+                selectedState === s.state
+                  ? 'bg-gov-saffron text-white font-bold shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              <span>{s.state}</span>
+              <span className="text-[10px] opacity-75 font-semibold">({s.count})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search Bar */}
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
@@ -101,7 +210,7 @@ function SchemesContent() {
           <Button type="submit" variant="primary" size="md">
             <span>Apply Search</span>
           </Button>
-          {(search || selectedCategory || benefitType !== 'All') && (
+          {(search || selectedCategory || selectedState !== 'All' || selectedLevel !== 'All' || benefitType !== 'All') && (
             <Button type="button" variant="outline" size="md" onClick={resetFilters}>
               <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
               <span>Reset</span>
