@@ -26,6 +26,7 @@ function SchemesContent() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      params.append('limit', '150');
       if (search) params.append('search', search);
       if (selectedCategory) params.append('category', selectedCategory);
       if (benefitType && benefitType !== 'All') params.append('benefitType', benefitType);
@@ -64,16 +65,23 @@ function SchemesContent() {
     setSortBy('newest');
   };
 
+  const totalSchemesCount = categories.reduce((acc, c) => acc + (c.schemeCount || 0), 0) || schemes.length;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
       <div className="mb-8">
-        <span className="text-xs font-bold uppercase tracking-wider text-gov-saffron">Scheme Directory</span>
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <span className="text-xs font-bold uppercase tracking-wider text-gov-saffron">Statutory Scheme Directory</span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            {totalSchemesCount} Official Schemes Live
+          </span>
+        </div>
         <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white mt-1">
           Explore Government Schemes
         </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Browse verified central and state welfare initiatives, direct subsidies, and credit guarantee schemes.
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-3xl">
+          Discover over 100 verified central and state welfare initiatives, direct subsidies, collateral-free credit lines, and health coverage schemes across India.
         </p>
       </div>
 
@@ -101,17 +109,17 @@ function SchemesContent() {
           )}
         </form>
 
-        {/* Categories Tab Scroll */}
+        {/* Categories Tab Scroll with Counts */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
           <button
             onClick={() => setSelectedCategory('')}
             className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-colors ${
               !selectedCategory
-                ? 'bg-gov-saffron text-white font-semibold'
+                ? 'bg-gov-saffron text-white font-semibold shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
-            All Categories
+            All Categories ({totalSchemesCount})
           </button>
           {categories.map((cat) => (
             <button
@@ -119,11 +127,11 @@ function SchemesContent() {
               onClick={() => setSelectedCategory(cat.slug)}
               className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-colors ${
                 selectedCategory === cat.slug
-                  ? 'bg-gov-saffron text-white font-semibold'
+                  ? 'bg-gov-saffron text-white font-semibold shadow-sm'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
               }`}
             >
-              {cat.name}
+              {cat.name} {cat.schemeCount ? `(${cat.schemeCount})` : ''}
             </button>
           ))}
         </div>
