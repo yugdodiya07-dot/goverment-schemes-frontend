@@ -57,6 +57,7 @@ export const EligibilityWizard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
   const [serverWarnings, setServerWarnings] = useState<string[]>([]);
+  const [resultsTab, setResultsTab] = useState<'eligible' | 'ineligible'>('eligible');
 
   const [formData, setFormData] = useState({
     age: 28,
@@ -68,6 +69,14 @@ export const EligibilityWizard: React.FC = () => {
     disabilityStatus: false,
     specialStatus: [] as string[],
   });
+
+  const eligibleSchemes = useMemo(() => {
+    return results ? results.filter((s) => s.isEligible) : [];
+  }, [results]);
+
+  const ineligibleSchemes = useMemo(() => {
+    return results ? results.filter((s) => !s.isEligible) : [];
+  }, [results]);
 
   // Real-time civic statutory validations & warning rules
   const validation = useMemo(() => {
@@ -173,8 +182,12 @@ export const EligibilityWizard: React.FC = () => {
       if (res.data?.data?.schemes) {
         setResults(res.data.data.schemes);
         setServerWarnings(res.data.data.warnings || []);
+        const eligibleCount = res.data.data.eligibleCount ?? res.data.data.schemes.filter((s: any) => s.isEligible).length;
+        setResultsTab(eligibleCount > 0 ? 'eligible' : 'ineligible');
         setStep(4);
-        confetti({ particleCount: 90, spread: 75, origin: { y: 0.6 } });
+        if (eligibleCount > 0) {
+          confetti({ particleCount: 90, spread: 75, origin: { y: 0.6 } });
+        }
       }
     } catch (e: any) {
       alert(e.response?.data?.message || 'Failed to calculate eligibility');
@@ -187,6 +200,7 @@ export const EligibilityWizard: React.FC = () => {
     setStep(1);
     setResults(null);
     setServerWarnings([]);
+    setResultsTab('eligible');
   };
 
   return (
@@ -580,7 +594,7 @@ export const EligibilityWizard: React.FC = () => {
 
       {/* Step 4: Results & Detailed Breakdown */}
       {step === 4 && results && (
-        <div className="space-y-8 animate-in fade-in zoom-in-95 duration-200">
+        <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
           {/* Summary Banner */}
           <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-amber-500/10 to-transparent border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
@@ -588,10 +602,10 @@ export const EligibilityWizard: React.FC = () => {
                 Statutory Assessment Complete
               </span>
               <h3 className="font-extrabold text-2xl text-slate-900 dark:text-white mt-1">
-                You Qualify for {results.filter((s) => s.isEligible).length} Welfare Schemes!
+                You Qualify for {eligibleSchemes.length} Welfare Scheme{eligibleSchemes.length === 1 ? '' : 's'}!
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                Verified against: Age ({formData.age} yrs), Income (₹{formData.annualIncome.toLocaleString('en-IN')}), Category ({formData.category}), and Occupation ({formData.occupation}).
+                Evaluated against: Age ({formData.age} yrs), Income (₹{formData.annualIncome.toLocaleString('en-IN')}), Category ({formData.category}), and Occupation ({formData.occupation}).
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={resetWizard}>
@@ -612,31 +626,135 @@ export const EligibilityWizard: React.FC = () => {
             </div>
           )}
 
-          {/* Schemes Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {results.map((item) => (
-              <div key={item.scheme._id} className="relative">
-                <SchemeCard scheme={item.scheme} matchScore={item.score} />
-                <div className="mt-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs">
-                  <span className="font-bold text-[11px] text-slate-500 uppercase tracking-wider">Statutory Match Audit:</span>
-                  <ul className="mt-1 space-y-1 text-[11px]">
-                    {item.matchedRules.slice(0, 2).map((rule: string, i: number) => (
-                      <li key={i} className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                        <CheckCircle2 className="w-3 h-3 shrink-0" />
-                        <span className="line-clamp-1">{rule}</span>
-                      </li>
-                    ))}
-                    {item.unmatchedRules.slice(0, 1).map((rule: string, i: number) => (
-                      <li key={i} className="flex items-center gap-1 text-slate-400">
-                        <XCircle className="w-3 h-3 shrink-0 text-slate-400" />
-                        <span className="line-clamp-1">{rule}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ))}
+          {/* Results Tab Navigation: Eligible vs Disqualified */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+            <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 w-fit">
+              <button
+                type="button"
+                onClick={() => setResultsTab('eligible')}
+                className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition-all ${
+                  resultsTab === 'eligible'
+                    ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Directly Eligible Schemes ({eligibleSchemes.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setResultsTab('ineligible')}
+                className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition-all ${
+                  resultsTab === 'ineligible'
+                    ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                <span>Disqualified / Other Schemes ({ineligibleSchemes.length})</span>
+              </button>
+            </div>
+
+            <span className="text-[11px] text-slate-400 font-medium">
+              Showing {resultsTab === 'eligible' ? eligibleSchemes.length : ineligibleSchemes.length} of {results.length} total schemes
+            </span>
           </div>
+
+          {/* TAB 1: Directly Eligible Schemes */}
+          {resultsTab === 'eligible' && (
+            <div>
+              {eligibleSchemes.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {eligibleSchemes.map((item) => (
+                    <div key={item.scheme._id} className="relative flex flex-col">
+                      <SchemeCard scheme={item.scheme} matchScore={item.score} />
+                      <div className="mt-2.5 p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40 text-xs">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="font-bold text-[11px] text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Statutory Match Confirmed (100%)
+                          </span>
+                          <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+                            Fully Qualified
+                          </span>
+                        </div>
+                        <ul className="space-y-1.5 text-[11px]">
+                          {item.matchedRules.map((rule: string, i: number) => (
+                            <li key={i} className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="line-clamp-1">{rule}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-6 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                    <Info className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-base text-slate-900 dark:text-white">
+                    No Direct Scheme Matches for this Exact Profile
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1.5">
+                    Your combination of age ({formData.age} yrs), occupation ({formData.occupation}), and income (₹{formData.annualIncome.toLocaleString('en-IN')}) did not qualify for direct central schemes.
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setResultsTab('ineligible')}
+                      className="text-xs font-bold text-gov-saffron hover:underline"
+                    >
+                      View Disqualified Schemes & Audit Reasons →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: Disqualified / Ineligible Schemes */}
+          {resultsTab === 'ineligible' && (
+            <div>
+              {ineligibleSchemes.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {ineligibleSchemes.map((item) => (
+                    <div key={item.scheme._id} className="relative flex flex-col opacity-90 hover:opacity-100 transition-opacity">
+                      <SchemeCard scheme={item.scheme} matchScore={item.score} />
+                      <div className="mt-2.5 p-3.5 rounded-2xl bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="font-bold text-[11px] text-rose-700 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            Statutory Disqualification Audit
+                          </span>
+                          <span className="text-[10px] bg-rose-100 dark:bg-rose-900/80 text-rose-700 dark:text-rose-300 font-bold px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">
+                            Disqualified
+                          </span>
+                        </div>
+                        <ul className="space-y-1.5 text-[11px]">
+                          {(item.disqualifications?.length ? item.disqualifications : item.unmatchedRules || []).map((reason: string, i: number) => (
+                            <li key={i} className="flex items-start gap-1.5 text-rose-800 dark:text-rose-300">
+                              <span className="text-rose-500 font-bold shrink-0">•</span>
+                              <span>{reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-6 rounded-3xl border border-dashed border-emerald-200 bg-emerald-50/30">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                    Congratulations! You Qualify for All Evaluated Schemes!
+                  </h4>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
